@@ -1,0 +1,8 @@
+# Ne JAMAIS committer les clés SSH générées localement
+agent/ssh/
+
+# Variables d'environnement locales
+.env
+
+# Données runtime Jenkins (si jamais montées en bind plutôt qu'en volume nommé)
+jenkins_home/

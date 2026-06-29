@@ -1,0 +1,67 @@
+# CodeAlpha DevOps - Tâche 2 : Jenkins Remoting Project
+#
+# Topologie :
+#   - jenkins-controller : le contrôleur Jenkins (UI sur http://localhost:8080)
+#   - agent-build         : noeud distant (label "linux-build"), connecté via SSH Remoting
+#   - agent-test          : noeud distant (label "linux-test"), connecté via SSH Remoting
+#
+# Isolation des noeuds : aucun port n'est publié vers l'hôte pour les agents
+# (JENKINS_AGENT_SSH_PUBKEY n'autorise QUE la connexion depuis le contrôleur,
+# via le réseau Docker interne "jenkins_net"). Les agents ne sont jamais
+# exposés directement sur le réseau hôte.
+#
+# Avant de lancer :
+#   1. ./generate-keys.sh                                  (génère la paire de clés SSH)
+#   2. export AGENT_SSH_PUBKEY="$(cat agent/ssh/id_rsa.pub)"
+#   3. export AGENT_SSH_PRIVATE_KEY="$(cat agent/ssh/id_rsa)"
+#   4. export JENKINS_ADMIN_PASSWORD="change-me-une-vraie-valeur"
+#   5. docker compose up -d --build
+
+services:
+
+  jenkins-controller:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: codealpha-jenkins-controller:1.0.0
+    container_name: jenkins_controller
+    ports:
+      - "8080:8080"        # interface web Jenkins (seul service exposé à l'hôte)
+    environment:
+      - CASC_JENKINS_CONFIG=/var/jenkins_home/casc_configs/jenkins.yaml
+      - JENKINS_ADMIN_PASSWORD=${JENKINS_ADMIN_PASSWORD}
+      - AGENT_SSH_PRIVATE_KEY=${AGENT_SSH_PRIVATE_KEY}
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./casc_configs:/var/jenkins_home/casc_configs:ro
+    networks:
+      - jenkins_net
+    restart: unless-stopped
+
+  agent-build:
+    image: jenkins/ssh-agent:jdk21
+    container_name: jenkins_agent_build
+    hostname: agent-build
+    environment:
+      - JENKINS_AGENT_SSH_PUBKEY=${AGENT_SSH_PUBKEY}
+    networks:
+      - jenkins_net
+    # Pas de "ports:" -> non joignable depuis l'hôte, uniquement depuis le contrôleur
+    restart: unless-stopped
+
+  agent-test:
+    image: jenkins/ssh-agent:jdk21
+    container_name: jenkins_agent_test
+    hostname: agent-test
+    environment:
+      - JENKINS_AGENT_SSH_PUBKEY=${AGENT_SSH_PUBKEY}
+    networks:
+      - jenkins_net
+    restart: unless-stopped
+
+networks:
+  jenkins_net:
+    driver: bridge
+
+volumes:
+  jenkins_home:
