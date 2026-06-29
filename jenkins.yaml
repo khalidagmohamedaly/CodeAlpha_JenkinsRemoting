@@ -1,0 +1,66 @@
+# CodeAlpha DevOps - Tâche 2 : Jenkins Remoting Project
+# Configuration as Code (JCasC) : définit le contrôleur, les 2 noeuds distants
+# (connexion via SSH Remoting) et les identifiants associés.
+#
+# Les valeurs sensibles (${...}) sont injectées via variables d'environnement
+# au démarrage du conteneur — rien n'est codé en dur, rien n'est committé.
+
+jenkins:
+  systemMessage: "CodeAlpha DevOps - Démo Jenkins Remoting (Tâche 2)"
+  # Le contrôleur n'exécute aucun build lui-même : isolation stricte,
+  # tout le travail est distribué vers les noeuds distants.
+  numExecutors: 0
+  mode: EXCLUSIVE
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  nodes:
+    - permanent:
+        name: "agent-build"
+        labelString: "linux-build docker"
+        numExecutors: 2
+        remoteFS: "/home/jenkins/agent"
+        mode: EXCLUSIVE
+        retentionStrategy: "always"
+        launcher:
+          ssh:
+            host: "agent-build"
+            port: 22
+            credentialsId: "agent-ssh-key"
+            sshHostKeyVerificationStrategy: "nonVerifyingKeyVerificationStrategy"
+
+    - permanent:
+        name: "agent-test"
+        labelString: "linux-test docker"
+        numExecutors: 2
+        remoteFS: "/home/jenkins/agent"
+        mode: EXCLUSIVE
+        retentionStrategy: "always"
+        launcher:
+          ssh:
+            host: "agent-test"
+            port: 22
+            credentialsId: "agent-ssh-key"
+            sshHostKeyVerificationStrategy: "nonVerifyingKeyVerificationStrategy"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - basicSSHUserPrivateKey:
+              scope: GLOBAL
+              id: "agent-ssh-key"
+              description: "Clé privée utilisée par le contrôleur pour se connecter aux agents distants"
+              username: "jenkins"
+              privateKeySource:
+                directEntry:
+                  privateKey: "${AGENT_SSH_PRIVATE_KEY}"
